@@ -1,0 +1,45 @@
+Task 1: Modelarea matematică a consumului de combustibil și identificarea factorilor de influență
+
+Consumul de combustibil al unui vehicul autonom depinde de mai mulți factori, printre care:
+
+	• Viteza vehiculului: Un consum optim apare la o viteză moderată, deoarece viteza mare crește rezistența aerodinamică.
+	• Accelerarea și frânarea: Schimbările bruște de viteză cresc consumul. O conducere lină reduce consumul.
+	• Tipul drumului: Dealurile și terenul accidentat necesită mai mult combustibil decât drumurile plane.
+	• Traficul și opririle frecvente: Staționările și pornirile frecvente măresc consumul.
+	• Greutatea vehiculului: O greutate mai mare necesită mai mult combustibil pentru accelerare.
+	• Condițiile meteo: Vântul și temperatura pot afecta consumul.
+
+Modelul matematic de bază pentru consumul de combustibil poate fi exprimat ca:
+
+				C=f(v,a,θ,m,T,P) 
+
+unde:
+	• C este consumul de combustibil,
+	• v este viteza,
+	• a este accelerația,
+	• θ este înclinarea drumului,
+	• m este masa vehiculului,
+	• T este temperatura exterioară,
+	• P sunt alți factori externi (trafic, vânt).
+
+Se poate folosi un model empiric precum consumul specific de combustibil (BSFC - Brake Specific Fuel Consumption) pentru optimizare.
+
+
+Task 2: Analiza complexității algoritmilor de optimizare a traseului
+
+Pentru optimizarea traseului vom folosi A* sau Dijkstra, ambele fiind algoritmi de căutare în graf.
+
+	• Algoritmul Dijkstra
+		o Oferă cea mai scurtă distanță de la un nod sursă la toate celelalte noduri.
+		o Complexitate: O((V+E)logV), unde V este numărul de noduri și E numărul de muchii.
+		o Bun pentru graful static, dar nu ia în considerare alți factori precum consumul de combustibil sau variațiile de teren.
+	• Algoritmul A*
+		o Oferă o cale optimă utilizând o funcție euristică h(n) care estimează costul de la un nod la destinație.
+		o Complexitate: O(b^d), unde b este factorul de ramificare (numărul de noduri vecine) și d este adâncimea căutării.
+		o Mai flexibil și mai eficient pentru trasee complexe, deoarece putem introduce consumul de combustibil în funcția euristică.
+A* este preferat deoarece putem include costul energetic în funcția de evaluare:
+
+				f(n)=g(n)+h(n) 
+unde:
+	• g(n) este costul parcurs de la start la nodul nnn,
+	• h(n) este o estimare a costului rămas până la destinație.
