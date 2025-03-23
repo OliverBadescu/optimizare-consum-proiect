@@ -145,10 +145,22 @@ end
 % Calcularea distanței totale a unui traseu
 function total_distance = calculateRouteDistance(route, distanceMatrix)
     total_distance = 0;
-    for i = 1:length(route)-1
-        total_distance = total_distance + distanceMatrix(route(i), route(i+1));
+    
+    for i = 1:length(route) - 1
+        from = route(i);
+        to = route(i+1);
+
+        % Verificăm dacă indicii sunt valizi
+        if from < 1 || from > size(distanceMatrix, 1) || to < 1 || to > size(distanceMatrix, 2)
+            warning('Index invalid in calculateRouteDistance: %d -> %d', from, to);
+            continue;
+        end
+
+        total_distance = total_distance + distanceMatrix(from, to);
     end
 end
+
+
 
 % Algoritmul Simulated Annealing pentru optimizarea traseului
 function [best_route, best_dist] = simulatedAnnealing(initial_route, distanceMatrix, initial_temp, cooling_rate, num_iterations)
@@ -235,17 +247,20 @@ end
 
 % Funcții auxiliare pentru algoritmul genetic
 function population = initializePopulation(pop_size, n, start_depot)
-    population = zeros(pop_size, n+1);
+    population = zeros(pop_size, n + 1); 
+
     for i = 1:pop_size
-        route = [start_depot, randperm(n-1) + (start_depot ~= 1), start_depot];
-        route(route == start_depot & (1:n+1) ~= 1 & (1:n+1) ~= n+1) = [];
+        % Generăm un traseu valid fără noduri 0
+        route = randperm(n - 1) + 1; % Nodurile trebuie să fie între 2 și n
+
+        % Asigurăm că traseul începe și se termină la start_depot
         route = [start_depot, route, start_depot];
-        if length(route) > n+1
-            route = route(1:n+1);
-        end
+
+        % Salvăm traseul în populație
         population(i, :) = route;
     end
 end
+
 
 function fitness = evaluatePopulation(population, distanceMatrix)
     [pop_size, ~] = size(population);
@@ -278,63 +293,45 @@ function children = crossover(parents, pop_size, start_depot)
             p1 = parents(i, :);
             p2 = parents(i+1, :);
             
-            % Ordered Crossover (OX)
-            cut1 = randi([2, route_length-2]);
-            cut2 = randi([cut1+1, route_length-1]);
-            
-            % Copiii primesc segmentele de la părinți
-            c1 = zeros(1, route_length);
-            c2 = zeros(1, route_length);
-            
-            c1(1) = start_depot;
-            c1(end) = start_depot;
-            c2(1) = start_depot;
-            c2(end) = start_depot;
-            
+            % Alegem un segment aleatoriu pentru crossover
+            cut1 = randi([2, route_length - 2]);
+            cut2 = randi([cut1 + 1, route_length - 1]);
+
+            % Inițializăm copiii cu start_depot
+            c1 = ones(1, route_length) * -1;
+            c2 = ones(1, route_length) * -1;
+
+            c1([1, end]) = start_depot;
+            c2([1, end]) = start_depot;
+
+            % Copiem segmentul de la părinți
             c1(cut1:cut2) = p1(cut1:cut2);
             c2(cut1:cut2) = p2(cut1:cut2);
+
+            % Completăm cu nodurile rămase
+            fill_idx1 = 2;
+            fill_idx2 = 2;
             
-            % Completăm restul nodurilor
-            p1_idx = cut2 + 1;
-            c1_idx = cut2 + 1;
-            
-            while c1_idx <= route_length-1 || (c1_idx > route_length-1 && c1_idx < cut1)
-                if p1_idx > route_length-1
-                    p1_idx = 2;
-                end
-                
-                if ~ismember(p2(p1_idx), c1) && p2(p1_idx) ~= start_depot
-                    if c1_idx > route_length-1
-                        c1_idx = 2;
+            for j = 2:route_length-1
+                if ~ismember(p2(j), c1) && p2(j) ~= start_depot
+                    while c1(fill_idx1) ~= -1
+                        fill_idx1 = fill_idx1 + 1;
                     end
-                    
-                    c1(c1_idx) = p2(p1_idx);
-                    c1_idx = c1_idx + 1;
+                    c1(fill_idx1) = p2(j);
                 end
                 
-                p1_idx = p1_idx + 1;
-            end
-            
-            p2_idx = cut2 + 1;
-            c2_idx = cut2 + 1;
-            
-            while c2_idx <= route_length-1 || (c2_idx > route_length-1 && c2_idx < cut1)
-                if p2_idx > route_length-1
-                    p2_idx = 2;
-                end
-                
-                if ~ismember(p1(p2_idx), c2) && p1(p2_idx) ~= start_depot
-                    if c2_idx > route_length-1
-                        c2_idx = 2;
+                if ~ismember(p1(j), c2) && p1(j) ~= start_depot
+                    while c2(fill_idx2) ~= -1
+                        fill_idx2 = fill_idx2 + 1;
                     end
-                    
-                    c2(c2_idx) = p1(p2_idx);
-                    c2_idx = c2_idx + 1;
+                    c2(fill_idx2) = p1(j);
                 end
-                
-                p2_idx = p2_idx + 1;
             end
-            
+
+            % Înlocuim -1 cu valori valide
+            c1(c1 == -1) = start_depot;
+            c2(c2 == -1) = start_depot;
+
             children(i, :) = c1;
             children(i+1, :) = c2;
         else
@@ -348,20 +345,21 @@ function children = mutate(children, mutation_rate, start_depot)
     
     for i = 1:pop_size
         if rand < mutation_rate
-            % Swap Mutation
-            idx1 = randi([2, route_length-1]);
-            idx2 = randi([2, route_length-1]);
-            
+            % Alegem două poziții diferite din traseu (fără depozit)
+            idx1 = randi([2, route_length - 1]);
+            idx2 = randi([2, route_length - 1]);
             while idx1 == idx2
-                idx2 = randi([2, route_length-1]);
+                idx2 = randi([2, route_length - 1]);
             end
             
+            % Facem swap între cele două noduri
             temp = children(i, idx1);
             children(i, idx1) = children(i, idx2);
             children(i, idx2) = temp;
         end
     end
 end
+
 
 function [new_population, new_fitness] = replacePopulation(population, fitness, children, children_fitness)
     pop_size = size(population, 1);
@@ -823,6 +821,38 @@ function visualizePerformanceComparison(performanceResults)
 end
 
 % Task 7: Aplicații reale în transport și vehicule autonome
+function plotOptimizedRoutes(delivery_x, delivery_y, depot_x, depot_y, nn_route, twoopt_route, sa_route, ga_route)
+    % Desenăm locațiile de livrare și depozitul
+    figure;
+    hold on;
+    scatter(delivery_x, delivery_y, 'ro', 'DisplayName', 'Livrări');
+    scatter(depot_x, depot_y, 'bs', 'DisplayName', 'Depozit');
+    
+    % Traseul algoritmului Nearest Neighbor
+    plot(delivery_x(nn_route), delivery_y(nn_route), '-o', 'DisplayName', 'Nearest Neighbor');
+    
+    % Traseul algoritmului Two-Opt
+    plot(delivery_x(twoopt_route), delivery_y(twoopt_route), '-o', 'DisplayName', 'Two-Opt');
+    
+    % Traseul algoritmului Simulated Annealing
+    plot(delivery_x(sa_route), delivery_y(sa_route), '-o', 'DisplayName', 'Simulated Annealing');
+    
+    % Traseul algoritmului Genetic Algorithm
+    plot(delivery_x(ga_route), delivery_y(ga_route), '-o', 'DisplayName', 'Genetic Algorithm');
+    
+    % Setăm titlul și etichetele
+    title('Vizualizare Rute Optimizate');
+    xlabel('Coordonata X');
+    ylabel('Coordonata Y');
+    
+    % Adăugăm legenda
+    legend;
+    
+    % Menținem scala fixă pe axele X și Y
+    axis equal;
+    hold off;
+end
+
 % ----------------------------------------------------------
 function realWorldApplication()
     % Definim o zonă urbană de 100x100
@@ -863,3 +893,96 @@ function realWorldApplication()
     % Vizualizăm rezultatele
     plotOptimizedRoutes(delivery_x, delivery_y, depot_x, depot_y, nn_route, twoopt_route, sa_route, ga_route);
 end
+
+
+clc; clear; close all;
+
+% Definirea grafului traseului
+num_nodes = 6;
+graph = [0 10 0 30 100 0; 
+         10 0 50 0 0 0; 
+         0 50 0 20 10 60; 
+         30 0 20 0 60 0; 
+         100 0 10 60 0 10; 
+         0 0 60 0 10 0];
+
+% Testare algoritm Dijkstra
+start_node = 1;
+end_node = 6;
+[dist, path] = dijkstra(graph, start_node, end_node);
+fprintf('Dijkstra: Distanta minima de la %d la %d este %.2f\n', start_node, end_node, dist(end_node));
+fprintf('Drumul optim: %s\n', mat2str(path));
+
+% Crearea vehiculului
+vehicle = createVehicle(1, 50, start_node);
+disp('Vehicul creat:');
+disp(vehicle);
+
+% Crearea unui nod (client)
+node = createNode(2, 10, 20, 15, [8, 12]);
+disp('Nod creat:');
+disp(node);
+
+% Crearea traseului
+routeData = createRouteData([node], [vehicle], graph);
+disp('Structura traseului:');
+disp(routeData);
+
+% Testare algoritm Nearest Neighbor
+disp('Executare Nearest Neighbor...');
+nn_route = nearestNeighbor(graph, 1);
+disp('Traseu Nearest Neighbor:');
+disp(nn_route);
+
+% Testare algoritm 2-Opt
+disp('Executare 2-Opt...');
+[twoopt_route, twoopt_distance] = twoOpt(nn_route, graph);
+fprintf('2-Opt Distance: %.2f\n', twoopt_distance);
+disp('Traseu 2-Opt:');
+disp(twoopt_route);
+
+% Testare Simulated Annealing
+disp('Executare Simulated Annealing...');
+[sa_route, sa_distance] = simulatedAnnealing(nn_route, graph, 100, 0.95, 1000);
+fprintf('Simulated Annealing Distance: %.2f\n', sa_distance);
+disp('Traseu Simulated Annealing:');
+disp(sa_route);
+distanceMatrix = graph;
+distanceMatrix(distanceMatrix == 0) = inf; 
+for i = 1:num_nodes
+    distanceMatrix(i, i) = 0; 
+end
+
+disp('Executare Algoritm Genetic...');
+
+% Corectăm matricea de distanțe
+distanceMatrix = graph;
+distanceMatrix(distanceMatrix == 0) = inf;
+for i = 1:num_nodes
+    distanceMatrix(i, i) = 0;
+end
+
+% Apel algoritmul genetic
+[ga_route, ga_distance] = geneticAlgorithm(distanceMatrix, 50, 100, 0.1, 1);
+
+% Afișăm rezultatele
+fprintf('Genetic Algorithm Distance: %.2f\n', ga_distance);
+disp('Traseu Genetic Algorithm:');
+disp(ga_route);
+% Testarea funcției principale
+disp('Executare testVehicleRouting...');
+testResults = testVehicleRouting();
+disp('Rezultate testVehicleRouting:');
+disp(testResults);
+
+% Compararea performanței algoritmilor
+disp('Executare compareAlgorithmPerformance...');
+performanceResults = compareAlgorithmPerformance(5, 5, 10);
+disp('Rezultate compareAlgorithmPerformance:');
+disp(performanceResults);
+
+disp('Executare realWorldApplication...');
+realWorldApplication();
+
+disp('TOATE FUNCȚIILE AU FOST TESTATE!');
+
