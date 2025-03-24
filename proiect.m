@@ -19,7 +19,9 @@ function [dist, path] = dijkstra(graph, start_node, end_node)
     dist(start_node) = 0;
     
     for i = 1:num_nodes
-        [~, u] = min(dist + visited * inf);
+        unvisited = find(~visited);
+        [~, idx] = min(dist(unvisited));
+        u = unvisited(idx);
         visited(u) = true;
         
         for v = 1:num_nodes
@@ -985,4 +987,3 @@ disp('Executare realWorldApplication...');
 realWorldApplication();
 
 disp('TOATE FUNCȚIILE AU FOST TESTATE!');
-
